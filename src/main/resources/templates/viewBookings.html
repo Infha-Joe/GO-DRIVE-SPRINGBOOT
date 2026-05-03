@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Bookings — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/admin-dashboard" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3);">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/admin-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>All Bookings</h1>
+    <p>Approve cancellation requests and manage bookings</p>
+  </div>
+
+  <div class="table-wrapper">
+    <div id="loading" class="spinner"></div>
+
+    <table id="bookingTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Customer</th>
+          <th>Vehicle</th>
+          <th>Days</th>
+          <th>Total</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Admin Action</th>
+        </tr>
+      </thead>
+      <tbody id="bookingBody"></tbody>
+    </table>
+
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="icon">📋</div>
+      <p>No bookings found.</p>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  requireAdmin();
+
+  async function loadBookings() {
+    try {
+      const bookings = await apiFetch('/api/bookings');
+
+      document.getElementById('loading').style.display = 'none';
+
+      const table = document.getElementById('bookingTable');
+      const empty = document.getElementById('emptyState');
+
+      if (bookings.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+
+      empty.style.display = 'none';
+      table.style.display = 'table';
+
+      document.getElementById('bookingBody').innerHTML = bookings.map(b => `
+        <tr>
+          <td>${b.id}</td>
+
+          <td>
+            <strong>${b.customer ? b.customer.name : '—'}</strong><br>
+            <small style="color:var(--muted)">
+              ${b.customer ? b.customer.email : ''}
+            </small>
+          </td>
+
+          <td>
+            ${b.vehicle ? typeIcon(b.vehicle.type) + ' ' + b.vehicle.model : '—'}
+          </td>
+
+          <td>${b.days} day${b.days > 1 ? 's' : ''}</td>
+
+          <td><strong>${fmtCurrency(b.totalAmount)}</strong></td>
+
+          <td>${fmtDate(b.bookingDate)}</td>
+
+          <td>${statusBadge(b.status)}</td>
+
+          <td>
+            ${b.status === 'ACTIVE' ? `
+              <button class="btn btn-success btn-sm" onclick="completeBooking(${b.id})">
+                ✅ Complete
+              </button>
+            ` : ''}
+
+            ${b.status === 'CANCEL_REQUESTED' ? `
+              <button class="btn btn-danger btn-sm" onclick="approveCancel(${b.id})">
+                ✅ Approve Cancel
+              </button>
+            ` : ''}
+
+            ${b.status !== 'ACTIVE' && b.status !== 'CANCEL_REQUESTED' ? '—' : ''}
+          </td>
+        </tr>
+      `).join('');
+
+    } catch (e) {
+      document.getElementById('loading').style.display = 'none';
+      toast('Failed to load bookings', 'error');
+    }
+  }
+
+  async function approveCancel(id) {
+    if (!confirm('Approve this cancellation request?')) return;
+
+    try {
+      await apiFetch(`/api/bookings/${id}/approve-cancel`, {
+        method: 'PUT'
+      });
+
+      toast('Cancellation approved');
+      loadBookings();
+
+    } catch (e) {
+      toast(e.message || 'Approval failed', 'error');
+    }
+  }
+
+  async function completeBooking(id) {
+    if (!confirm('Mark this booking as completed?')) return;
+
+    try {
+      await apiFetch(`/api/bookings/${id}/complete`, {
+        method: 'PUT'
+      });
+
+      toast('Booking completed');
+      loadBookings();
+
+    } catch (e) {
+      toast(e.message || 'Complete failed', 'error');
+    }
+  }
+
+  loadBookings();
+</script>
+
+</body>
+</html>

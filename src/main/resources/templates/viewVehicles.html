@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Vehicles — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    .edit-modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:200; align-items:center; justify-content:center;
+    }
+    .edit-modal-overlay.open { display:flex; }
+
+    .edit-modal {
+      background:#fff; border-radius:12px; padding:32px;
+      width:100%; max-width:400px;
+      box-shadow:0 20px 60px rgba(0,0,0,.3);
+    }
+
+    .edit-modal h3 { margin-bottom:20px; font-size:1.1rem; }
+  </style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/admin-dashboard" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3);">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/admin-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>All Vehicles</h1>
+    <p>Manage GoDrive fleet</p>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search by model or type…" oninput="filterVehicles()">
+    <a href="/add-vehicle" class="btn btn-primary">+ Add Vehicle</a>
+  </div>
+
+  <div class="table-wrapper">
+    <div id="loading" class="spinner"></div>
+
+    <table id="vehicleTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Model</th>
+          <th>Rent/Day</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="vehicleBody"></tbody>
+    </table>
+
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="icon">🚫</div>
+      <p>No vehicles found.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="edit-modal-overlay" id="editModal">
+  <div class="edit-modal">
+    <h3>✏️ Edit Vehicle</h3>
+
+    <input type="hidden" id="editId">
+
+    <div class="form-group">
+      <label>Type</label>
+      <select id="editType">
+        <option value="CAR">🚗 CAR</option>
+        <option value="BIKE">🏍️ BIKE</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Model</label>
+      <input type="text" id="editModel">
+    </div>
+
+    <div class="form-group">
+      <label>Rent Per Day (₹)</label>
+      <input type="number" id="editRent" min="100">
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  requireAdmin();
+
+  let allVehicles = [];
+
+  async function loadVehicles() {
+    try {
+      allVehicles = await apiFetch('/api/vehicles');
+      document.getElementById('loading').style.display = 'none';
+      renderTable(allVehicles);
+    } catch(e) {
+      document.getElementById('loading').style.display = 'none';
+      toast('Failed to load vehicles', 'error');
+    }
+  }
+
+  function renderTable(vehicles) {
+    const table = document.getElementById('vehicleTable');
+    const body = document.getElementById('vehicleBody');
+    const empty = document.getElementById('emptyState');
+
+    if (vehicles.length === 0) {
+      table.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    table.style.display = 'table';
+    empty.style.display = 'none';
+
+    body.innerHTML = vehicles.map(v => `
+      <tr>
+        <td>${v.id}</td>
+        <td>${typeIcon(v.type)} ${v.type}</td>
+        <td><strong>${v.model}</strong></td>
+        <td>${fmtCurrency(v.rentPerDay)}</td>
+        <td>${availBadge(v.available)}</td>
+        <td>
+          <button class="btn btn-outline btn-sm"
+            onclick="openEdit(${v.id},'${v.type}','${v.model}',${v.rentPerDay})">✏️</button>
+
+          <button class="btn btn-danger btn-sm"
+            onclick="deleteVehicle(${v.id},'${v.model}')">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function filterVehicles() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+
+    renderTable(allVehicles.filter(v =>
+      v.model.toLowerCase().includes(q) ||
+      v.type.toLowerCase().includes(q)
+    ));
+  }
+
+  function openEdit(id, type, model, rent) {
+    document.getElementById('editId').value = id;
+    document.getElementById('editType').value = type;
+    document.getElementById('editModel').value = model;
+    document.getElementById('editRent').value = rent;
+
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('editModal').classList.remove('open');
+  }
+
+  async function saveEdit() {
+    const id = document.getElementById('editId').value;
+
+    const body = {
+      type: document.getElementById('editType').value,
+      model: document.getElementById('editModel').value.trim(),
+      rentPerDay: parseFloat(document.getElementById('editRent').value)
+    };
+
+    try {
+      await apiFetch(`/api/vehicles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      });
+
+      toast('Vehicle updated');
+      closeModal();
+      loadVehicles();
+
+    } catch(e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  async function deleteVehicle(id, model) {
+    if (!confirm(`Delete "${model}"?`)) return;
+
+    try {
+      await apiFetch(`/api/vehicles/${id}`, { method: 'DELETE' });
+      toast('Deleted');
+      loadVehicles();
+
+    } catch(e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  loadVehicles();
+</script>
+
+</body>
+</html>

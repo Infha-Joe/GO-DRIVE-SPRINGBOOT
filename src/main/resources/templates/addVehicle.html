@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Vehicle — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/admin-dashboard" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3);">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/admin-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper" style="max-width:520px;">
+  <div class="page-header">
+    <h1>Add Vehicle</h1>
+    <p>Fill in the details to add a new vehicle to the fleet</p>
+  </div>
+
+  <div class="card">
+    <div id="alert" class="alert alert-hidden"></div>
+
+    <div class="form-group">
+      <label>Vehicle Type</label>
+      <select id="type">
+        <option value="CAR">🚗 CAR</option>
+        <option value="BIKE">🏍️ BIKE</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Model Name</label>
+      <input type="text" id="model" placeholder="e.g. Honda City, Royal Enfield">
+    </div>
+    <div class="form-group">
+      <label>Rent Per Day (₹)</label>
+      <input type="number" id="rentPerDay" placeholder="Minimum ₹100" min="100">
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:8px;">
+      <button class="btn btn-primary" onclick="addVehicle()" id="addBtn">Add Vehicle</button>
+      <a href="/admin-dashboard" class="btn btn-outline">Cancel</a>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  requireAdmin();
+
+  async function addVehicle() {
+    const type = document.getElementById('type').value;
+    const model = document.getElementById('model').value.trim();
+    const rentPerDay = parseFloat(document.getElementById('rentPerDay').value);
+    const btn = document.getElementById('addBtn');
+
+    hideAlert();
+
+    if (!model) { showAlert('error', 'Please enter a model name.'); return; }
+    if (!rentPerDay || rentPerDay < 100) { showAlert('error', 'Rent per day must be at least ₹100.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+
+    try {
+      await apiFetch('/api/vehicles', {
+        method: 'POST',
+        body: JSON.stringify({ type, model, rentPerDay, available: true })
+      });
+      showAlert('success', `✅ ${model} added successfully!`);
+      document.getElementById('model').value = '';
+      document.getElementById('rentPerDay').value = '';
+    } catch (err) {
+      showAlert('error', err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add Vehicle';
+    }
+  }
+
+  function showAlert(type, msg) {
+    const el = document.getElementById('alert');
+    el.className = `alert alert-${type === 'error' ? 'error' : 'success'}`;
+    el.textContent = msg;
+  }
+  function hideAlert() {
+    document.getElementById('alert').className = 'alert alert-hidden';
+  }
+</script>
+</body>
+</html>

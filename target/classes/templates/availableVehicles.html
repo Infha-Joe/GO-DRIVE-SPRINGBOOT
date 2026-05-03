@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Available Vehicles — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/customer-dashboard" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3);">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/customer-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>Available Vehicles</h1>
+    <p>Choose a GoDrive vehicle and book it for your trip</p>
+  </div>
+
+  <div style="display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap;">
+    <input type="text" id="searchInput" placeholder="Search model…"
+      style="padding:10px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:0.9rem; flex:1; min-width:200px; outline:none;"
+      oninput="filterVehicles()">
+
+    <select id="typeFilter" onchange="filterVehicles()"
+      style="padding:10px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:0.9rem; background:#fff;">
+      <option value="">All Types</option>
+      <option value="CAR">🚗 Cars</option>
+      <option value="BIKE">🏍️ Bikes</option>
+    </select>
+  </div>
+
+  <div id="loading" class="spinner"></div>
+  <div id="vehicleGrid" class="vehicle-grid"></div>
+
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <div class="icon">😔</div>
+    <p>No vehicles available right now. Check back soon!</p>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  requireCustomer();
+  let allVehicles = [];
+
+  async function loadVehicles() {
+    try {
+      allVehicles = await apiFetch('/api/vehicles/available');
+      document.getElementById('loading').style.display = 'none';
+      renderVehicles(allVehicles);
+    } catch(e) {
+      document.getElementById('loading').style.display = 'none';
+      toast('Failed to load vehicles', 'error');
+    }
+  }
+
+  function renderVehicles(vehicles) {
+    const grid = document.getElementById('vehicleGrid');
+    const empty = document.getElementById('emptyState');
+
+    if (vehicles.length === 0) {
+      grid.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+
+    empty.style.display = 'none';
+
+    grid.innerHTML = vehicles.map(v => `
+      <div class="vehicle-card">
+        <div class="vc-type">${typeIcon(v.type)}</div>
+        <div class="vc-model">${v.model}</div>
+        <div class="vc-id">ID #${v.id} &nbsp;·&nbsp; ${v.type}</div>
+        <div class="vc-rent">${fmtCurrency(v.rentPerDay)} <span>/ day</span></div>
+        <a href="/book-vehicle?vehicleId=${v.id}" class="btn btn-primary" style="width:100%;justify-content:center;">
+          🗓️ Book Now
+        </a>
+      </div>
+    `).join('');
+  }
+
+  function filterVehicles() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const type = document.getElementById('typeFilter').value;
+
+    renderVehicles(allVehicles.filter(v =>
+      (!q || v.model.toLowerCase().includes(q)) &&
+      (!type || v.type === type)
+    ));
+  }
+
+  loadVehicles();
+</script>
+</body>
+</html>

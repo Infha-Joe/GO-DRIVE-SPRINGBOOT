@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Vehicle — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/customer-dashboard" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3);">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/customer-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper" style="max-width:540px;">
+  <div class="page-header">
+    <h1>Confirm Booking</h1>
+    <p>Check vehicle details and enter number of days</p>
+  </div>
+
+  <div class="card">
+    <div id="alert" class="alert alert-hidden"></div>
+
+    <div class="form-group">
+      <label>Booking For</label>
+      <input type="text" id="customerName" readonly style="background:#f8fafc;">
+    </div>
+
+    <div id="selectedVehicleBox" style="background:#f8fafc; padding:18px; border-radius:12px; margin-bottom:18px;">
+      <h3 id="vehicleName">Loading...</h3>
+      <p id="vehicleDetails"></p>
+    </div>
+
+    <div class="form-group">
+      <label>Number of Days</label>
+      <input type="number" id="days" min="1" max="365" placeholder="Enter days" oninput="updateTotal()">
+    </div>
+
+    <div id="totalBox" style="display:none; background:#eef6ff; padding:15px; border-radius:10px; margin-bottom:18px;">
+      <strong>Total Amount: </strong>
+      <span id="totalAmount">₹0</span>
+    </div>
+
+    <button class="btn btn-primary" id="bookBtn" onclick="confirmBooking()">Confirm Booking</button>
+    <a href="/available-vehicles" class="btn btn-outline">Back</a>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  const session = requireCustomer();
+  document.getElementById('customerName').value = session.name;
+
+  const params = new URLSearchParams(window.location.search);
+  const vehicleId = params.get('vehicleId');
+
+  let selectedVehicle = null;
+
+  async function loadSelectedVehicle() {
+    if (!vehicleId) {
+      showAlert('error', 'No vehicle selected. Please choose a vehicle first.');
+      return;
+    }
+
+    try {
+      const vehicles = await apiFetch('/api/vehicles/available');
+      selectedVehicle = vehicles.find(v => String(v.id) === String(vehicleId));
+
+      if (!selectedVehicle) {
+        showAlert('error', 'Selected vehicle is not available.');
+        return;
+      }
+
+      document.getElementById('vehicleName').textContent =
+        typeIcon(selectedVehicle.type) + " " + selectedVehicle.model;
+
+      document.getElementById('vehicleDetails').textContent =
+        selectedVehicle.type + " | Rent Per Day: " + fmtCurrency(selectedVehicle.rentPerDay);
+
+    } catch (e) {
+      showAlert('error', 'Failed to load vehicle details.');
+    }
+  }
+
+  function updateTotal() {
+    const days = parseInt(document.getElementById('days').value);
+
+    if (!selectedVehicle || !days || days < 1) {
+      document.getElementById('totalBox').style.display = 'none';
+      return;
+    }
+
+    const total = days * selectedVehicle.rentPerDay;
+    document.getElementById('totalAmount').textContent = fmtCurrency(total);
+    document.getElementById('totalBox').style.display = 'block';
+  }
+
+  async function confirmBooking() {
+    const days = parseInt(document.getElementById('days').value);
+    const btn = document.getElementById('bookBtn');
+
+    hideAlert();
+
+    if (!selectedVehicle) {
+      showAlert('error', 'No vehicle selected.');
+      return;
+    }
+
+    if (!days || days < 1 || days > 365) {
+      showAlert('error', 'Enter valid days between 1 and 365.');
+      return;
+    }
+
+    if (!confirm("Confirm booking for " + selectedVehicle.model + "?")) {
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Booking...';
+
+    try {
+      await apiFetch('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          customerId: session.customerId,
+          vehicleId: selectedVehicle.id,
+          days: days
+        })
+      });
+
+      alert("Booking successful!");
+      window.location.href = "/my-bookings";
+
+    } catch (err) {
+      showAlert('error', err.message || 'Booking failed');
+      btn.disabled = false;
+      btn.textContent = 'Confirm Booking';
+    }
+  }
+
+  function showAlert(type, msg) {
+    const el = document.getElementById('alert');
+    el.className = `alert alert-${type === 'error' ? 'error' : 'success'}`;
+    el.textContent = msg;
+  }
+
+  function hideAlert() {
+    document.getElementById('alert').className = 'alert alert-hidden';
+  }
+
+  loadSelectedVehicle();
+</script>
+
+</body>
+</html>

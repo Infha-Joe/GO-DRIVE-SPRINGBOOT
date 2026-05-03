@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Bookings — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    .booking-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 2px solid var(--border);
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .booking-card.active { border-color: #93c5fd; }
+    .booking-card.cancel_requested { border-color: #facc15; }
+    .booking-card.cancelled { border-color: #fca5a5; }
+    .booking-card.completed { border-color: #86efac; }
+
+    .bc-model { font-weight: bold; }
+    .bc-meta { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+    .bc-amount { font-weight: bold; color: var(--primary); font-size: 1.1rem; }
+    .bc-actions { margin-top: 10px; }
+  </style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <a href="/customer-dashboard" class="btn btn-outline btn-sm">← Dashboard</a>
+    <button class="btn-logout" onclick="logout('/customer-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+  <h1>My Bookings</h1>
+  <p>Track your GoDrive bookings</p>
+
+  <div id="bookingList"></div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  const session = requireCustomer();
+
+  async function loadBookings() {
+    try {
+      const bookings = await apiFetch(`/api/bookings/customer/${session.customerId}`);
+      const list = document.getElementById('bookingList');
+
+      if (bookings.length === 0) {
+        list.innerHTML = "<p>No bookings yet</p>";
+        return;
+      }
+
+      list.innerHTML = bookings.map(b => `
+        <div class="booking-card ${b.status.toLowerCase()}">
+          <div>
+            <div class="bc-model">${b.vehicle ? b.vehicle.model : 'Vehicle'}</div>
+            <div class="bc-meta">${b.days} days · ${formatStatus(b.status)}</div>
+            <div class="bc-meta">Booking ID: ${b.id}</div>
+
+            <div class="bc-actions">
+              ${b.status === 'ACTIVE' ? `
+                <button class="btn btn-danger btn-sm" onclick="requestCancel(${b.id})">
+                  Request Cancel
+                </button>
+              ` : ''}
+
+              ${b.status === 'CANCEL_REQUESTED' ? `
+                <span class="badge badge-amber">Waiting for admin approval</span>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="bc-amount">₹${b.totalAmount}</div>
+        </div>
+      `).join('');
+
+    } catch (e) {
+      toast('Failed to load bookings', 'error');
+    }
+  }
+
+  async function requestCancel(id) {
+    if (!confirm('Send cancellation request to admin?')) return;
+
+    try {
+      await apiFetch(`/api/bookings/${id}/request-cancel`, {
+        method: 'PUT'
+      });
+
+      toast('Cancellation request sent to admin');
+      loadBookings();
+
+    } catch (e) {
+      toast(e.message || 'Request failed', 'error');
+    }
+  }
+
+  function formatStatus(status) {
+    if (status === 'ACTIVE') return 'Active';
+    if (status === 'CANCEL_REQUESTED') return 'Cancel Requested';
+    if (status === 'CANCELLED') return 'Cancelled';
+    if (status === 'COMPLETED') return 'Completed';
+    return status;
+  }
+
+  loadBookings();
+</script>
+
+</body>
+</html>

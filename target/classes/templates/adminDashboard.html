@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbar-user"></span>
+    <button class="btn-logout" onclick="logout('/admin-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>Admin Dashboard</h1>
+    <p>Manage GoDrive vehicles and bookings</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="dash-grid">
+    <div class="dash-card">
+      <div class="icon">🚗</div>
+      <div class="info">
+        <div class="val" id="totalVehicles">—</div>
+        <div class="lbl">Total Vehicles</div>
+      </div>
+    </div>
+
+    <div class="dash-card green">
+      <div class="icon">✅</div>
+      <div class="info">
+        <div class="val" id="availVehicles">—</div>
+        <div class="lbl">Available</div>
+      </div>
+    </div>
+
+    <div class="dash-card amber">
+      <div class="icon">📋</div>
+      <div class="info">
+        <div class="val" id="totalBookings">—</div>
+        <div class="lbl">Total Bookings</div>
+      </div>
+    </div>
+
+    <div class="dash-card red">
+      <div class="icon">🔴</div>
+      <div class="info">
+        <div class="val" id="activeBookings">—</div>
+        <div class="lbl">Active Bookings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu -->
+  <div class="menu-grid">
+    <a href="/add-vehicle" class="menu-card">
+      <div class="mc-icon">➕</div>
+      <div class="mc-label">Add Vehicle</div>
+      <div class="mc-desc">Add a new car or bike</div>
+    </a>
+
+    <a href="/view-vehicles" class="menu-card">
+      <div class="mc-icon">🚙</div>
+      <div class="mc-label">View Vehicles</div>
+      <div class="mc-desc">Edit or delete vehicles</div>
+    </a>
+
+    <a href="/view-bookings" class="menu-card">
+      <div class="mc-icon">📋</div>
+      <div class="mc-label">All Bookings</div>
+      <div class="mc-desc">Manage customer bookings</div>
+    </a>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  requireAdmin();
+  renderTopbar('ADMIN');
+
+  async function loadStats() {
+    try {
+      const [vehicles, bookings] = await Promise.all([
+        apiFetch('/api/vehicles'),
+        apiFetch('/api/bookings')
+      ]);
+
+      document.getElementById('totalVehicles').textContent = vehicles.length;
+      document.getElementById('availVehicles').textContent = vehicles.filter(v => v.available).length;
+      document.getElementById('totalBookings').textContent = bookings.length;
+      document.getElementById('activeBookings').textContent =
+        bookings.filter(b => b.status === 'ACTIVE').length;
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  loadStats();
+</script>
+
+</body>
+</html>

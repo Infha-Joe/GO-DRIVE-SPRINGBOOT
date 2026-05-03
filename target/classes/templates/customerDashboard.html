@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dashboard — GoDrive</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">🚗 <span>Go</span>Drive</div>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbar-user"></span>
+    <button class="btn-logout" onclick="logout('/customer-login')">Logout</button>
+  </div>
+</div>
+
+<div class="page-wrapper">
+
+  <div class="greeting" id="greetingBanner">
+    <h2 id="greetingText">Hi there 👋</h2>
+    <p>Welcome back to GoDrive! What would you like to do today?</p>
+  </div>
+
+  <div class="dash-grid">
+    <div class="dash-card">
+      <div class="icon">🚗</div>
+      <div class="info">
+        <div class="val" id="availCount">—</div>
+        <div class="lbl">Available Vehicles</div>
+      </div>
+    </div>
+
+    <div class="dash-card amber">
+      <div class="icon">📋</div>
+      <div class="info">
+        <div class="val" id="myBookingsCount">—</div>
+        <div class="lbl">My Bookings</div>
+      </div>
+    </div>
+
+    <div class="dash-card green">
+      <div class="icon">✅</div>
+      <div class="info">
+        <div class="val" id="activeCount">—</div>
+        <div class="lbl">Active Bookings</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="menu-grid">
+
+
+    <a href="/available-vehicles" class="menu-card">
+  <div class="mc-icon">🗓️</div>
+  <div class="mc-label">Browse & Book Vehicles</div>
+  <div class="mc-desc">Choose an available vehicle and book it</div>
+</a>
+
+    <a href="/my-bookings" class="menu-card">
+      <div class="mc-icon">📋</div>
+      <div class="mc-label">My Bookings</div>
+      <div class="mc-desc">View and manage your bookings</div>
+    </a>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+  const session = requireCustomer();
+
+function capitalizeName(name) {
+  return name
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+const firstName = capitalizeName(session.name || 'there').split(' ')[0];  document.getElementById('greetingText').textContent = `Hi ${firstName} 👋`;
+  document.getElementById('topbar-user').innerHTML = `Logged in as <strong>${session.name}</strong>`;
+
+  async function loadStats() {
+    try {
+      const [available, myBookings] = await Promise.all([
+        apiFetch('/api/vehicles/available'),
+        apiFetch(`/api/bookings/customer/${session.customerId}`)
+      ]);
+
+      document.getElementById('availCount').textContent = available.length;
+      document.getElementById('myBookingsCount').textContent = myBookings.length;
+      document.getElementById('activeCount').textContent =
+        myBookings.filter(b => b.status === 'ACTIVE').length;
+
+    } catch(e) {
+      console.error('Stats load error', e);
+    }
+  }
+
+  loadStats();
+</script>
+
+</body>
+</html>
